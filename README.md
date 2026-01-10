@@ -41,27 +41,23 @@ Project ini dirancang sebagai:
 ## ⚙️ Instalasi
 
 1️⃣ Clone Repository
+
 bash
 git clone https://github.com/username/sql-ai-agent.git
 cd sql-ai-agent
+
 2️⃣ Buat & Aktifkan Virtual Environment
-bash
-Copy code
 python -m venv venv
+
 Windows:
-
-bash
-Copy code
 venv\Scripts\activate
-Linux / Mac:
 
-bash
-Copy code
+Linux / Mac:
 source venv/bin/activate
+
 3️⃣ Install Dependency
-bash
-Copy code
 pip install -r requirements.txt
+
 🗄️ Database & Schema
 Project ini menggunakan SQLite.
 
@@ -81,31 +77,21 @@ CREATE TABLE ecommerce (
   payment_method TEXT,
   purchase_date TEXT
 );
-Schema resmi tersedia di:
 
-pgsql
-Copy code
+Schema resmi tersedia di:
 migrate_schema.sql
+
 🔄 Migrasi Schema (Opsional)
 Masuk ke SQLite shell:
-
-bash
-Copy code
 sqlite3 data/ecommerce.db
+
 Lalu jalankan:
-
-sql
-Copy code
 .read migrate_schema.sql
-Keluar:
 
-sql
-Copy code
+Keluar:
 .exit
 
 ▶️ Menjalankan Aplikasi
-bash
-Copy code
 python main.py
 
 Contoh pertanyaan:
