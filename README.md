@@ -27,23 +27,6 @@ Project ini dirancang sebagai:
 4. Query divalidasi & dieksekusi ke SQLite
 5. Hasil dikembalikan sebagai DataFrame
 
----
-
-## 🗂️ Struktur Project
-sql-ai-agent/
-├── src/
-│ ├── init.py
-│ ├── agent_logic.py # Core logic SQL Agent
-│ └── sql_utils.py # SQL cleaner & helper
-├── data/
-│ └── README.md # Penjelasan dataset (tanpa .db)
-├── migrate_schema.sql # Script migrasi schema
-├── main.py # Entry point aplikasi
-├── requirements.txt
-├── .gitignore
-└── README.md
-
----
 
 ## 🛠️ Tech Stack
 - Python 3.9+
