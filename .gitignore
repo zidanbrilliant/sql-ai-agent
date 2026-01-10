@@ -1,5 +1,11 @@
+# Python
 venv/
 __pycache__/
+*.pyc
+
+# SQLite
+*.db
+data/*.db
+
+# Env
 .env
-*.db-journal
-.ipynb_checkpoints/

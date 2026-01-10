@@ -1,83 +1,162 @@
 from langchain_community.utilities import SQLDatabase
 from langchain_groq import ChatGroq
-from langchain_core.prompts import PromptTemplate
+from src.sql_utils import extract_sql, auto_quote_columns
+import pandas as pd
+from sqlalchemy import text
 
-def normalize_question(question: str) -> str:
-    replacements = {
-        "final price": "Final_Price(Rs.)",
-        "final_price": "Final_Price(Rs.)",
-        "harga akhir": "Final_Price(Rs.)",
-        "total penjualan": "SUM(Final_Price(Rs.))",
-    }
 
-    q = question.lower()
-    for k, v in replacements.items():
-        q = q.replace(k, v)
+# =========================
+# DB SCHEMA UTILITIES
+# =========================
 
-    return q
+def get_tables(db):
+    engine = db._engine
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT name
+            FROM sqlite_master
+            WHERE type='table'
+            AND name NOT LIKE 'sqlite_%';
+        """))
+        return [row[0] for row in result.fetchall()]
 
-def get_sql_executor():
-    # 1. Connect DB
-    db = SQLDatabase.from_uri("sqlite:///data/ecommerce.db")
 
-    # 2. LLM
+def get_table_columns(db, table_name):
+    engine = db._engine
+    with engine.connect() as conn:
+        result = conn.execute(text(f'PRAGMA table_info("{table_name}");'))
+        return [row[1] for row in result.fetchall()]
+
+
+def get_schema(db):
+    schema = {}
+    for table in get_tables(db):
+        schema[table] = get_table_columns(db, table)
+    return schema
+
+
+# =========================
+# RESULT NORMALIZER
+# =========================
+
+def result_to_dataframe(result):
+    """
+    Normalize SQLDatabase.run() output to pandas DataFrame
+    """
+    if result is None:
+        return pd.DataFrame()
+
+    # scalar result (SUM, COUNT, AVG, etc.)
+    if isinstance(result, (int, float, str)):
+        return pd.DataFrame([[result]], columns=["result"])
+
+    # single row
+    if isinstance(result, tuple):
+        return pd.DataFrame([result])
+
+    # multiple rows
+    if isinstance(result, list):
+        return pd.DataFrame(result)
+
+    # fallback
+    return pd.DataFrame([result])
+
+
+# =========================
+# MAIN EXECUTOR
+# =========================
+
+def get_sql_executor(db_path: str):
+
+    # 1️⃣ Connect DB
+    db = SQLDatabase.from_uri(f"sqlite:///{db_path}")
+
+    # 2️⃣ Load REAL schema
+    tables = get_tables(db)
+    schema = get_schema(db)
+
+    print("📦 Tables found:", tables)
+    print("🧱 Schema:", schema)
+
+    # 3️⃣ LLM (Groq)
     llm = ChatGroq(
         model="llama-3.1-8b-instant",
         temperature=0
     )
 
-    # 3. Prompt SQL generator
-    prompt = PromptTemplate(
-        input_variables=["question"],
-        template="""
-You are a senior SQL expert.
+    def run(question: str):
 
-Database:
-- Table name: ecommerce
-- Columns:
-  User_ID
-  Product_ID
-  Category
-  Price (Rs.)
-  Discount (%)
-  Final_Price(Rs.)
-  Payment_Method
-  Purchase_Date
+        base_prompt = f"""
+You are a senior SQLite expert.
+
+DATABASE SCHEMA (REAL):
+{schema}
 
 Rules:
+- Use ONLY tables and columns listed above
 - Use SQLite syntax
-- ALWAYS wrap column names with special characters in double quotes
+- Wrap column names with special characters using double quotes
+- DO NOT invent tables or columns
 - DO NOT explain anything
-- Output ONLY valid SQL
-
-Question:
-{question}
-
-SQL:
+- DO NOT use markdown
+- Output ONLY a single valid SQL query
 """
-    )
 
-    def run(question: str):
         try:
-            question = normalize_question(question)
-
-            sql = llm.invoke(
-                f"""
-                Given this question:
-                {question}
-
-                Generate a valid SQLite SQL query.
-                Use EXACT column names.
-                Table name is ecommerce.
-                """
+            # 🔹 Generate SQL
+            raw_sql = llm.invoke(
+                f"{base_prompt}\nQUESTION: {question}"
             ).content.strip()
 
-            print("\n📄 SQL yang dijalankan:")
-            print(sql)
+            print("\n🧠 Generated SQL:")
+            print(raw_sql)
 
-            result = db.run(sql)
-            return result
+            clean_sql = extract_sql(raw_sql)
+            clean_sql = auto_quote_columns(clean_sql, schema)
+
+
+            print("\n🧹 Cleaned SQL:")
+            print(clean_sql)
+
+            # 🔒 Safety check
+            if not any(t.lower() in clean_sql.lower() for t in tables):
+                return "❌ SQL tidak menggunakan tabel yang valid."
+
+            result = db.run(clean_sql)
+            return result_to_dataframe(result)
 
         except Exception as e:
-            return f"⚠️ Query gagal dijalankan, kemungkinan karena nama kolom.\nDetail error: {e}"
+            print("⚠️ SQL Error detected, retrying...")
+
+            retry_prompt = f"""
+The SQL query below is INVALID:
+
+{clean_sql}
+
+Error:
+{e}
+
+DATABASE SCHEMA:
+{schema}
+
+Rules:
+- FIX the SQL
+- DO NOT change table names
+- DO NOT invent columns
+- Output ONLY corrected SQL
+"""
+
+            fixed_raw = llm.invoke(
+                f"{retry_prompt}\nQUESTION: {question}"
+            ).content.strip()
+
+            fixed_sql = extract_sql(fixed_raw)
+            fixed_sql = auto_quote_columns(fixed_sql, schema)
+
+            print("\n🔧 Fixed SQL:")
+            print(fixed_sql)
+
+            result = db.run(fixed_sql)
+            return result_to_dataframe(result)
+
     return run
