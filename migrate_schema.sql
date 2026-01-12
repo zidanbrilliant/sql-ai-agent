@@ -1,12 +1,43 @@
--- Rename columns to SQL & AI-friendly names
+BEGIN TRANSACTION;
 
-ALTER TABLE ecommerce RENAME COLUMN "User_ID" TO user_id;
-ALTER TABLE ecommerce RENAME COLUMN "Product_ID" TO product_id;
-ALTER TABLE ecommerce RENAME COLUMN "Category" TO category;
+-- 1️⃣ Buat tabel baru dengan schema rapi
+CREATE TABLE ecommerce_new (
+    user_id TEXT,
+    product_id TEXT,
+    category TEXT,
+    price REAL,
+    discount_percent INTEGER,
+    final_price REAL,
+    payment_method TEXT,
+    purchase_date TEXT
+);
 
-ALTER TABLE ecommerce RENAME COLUMN "Price (Rs.)" TO price;
-ALTER TABLE ecommerce RENAME COLUMN "Discount (%)" TO discount_percent;
-ALTER TABLE ecommerce RENAME COLUMN "Final_Price(Rs.)" TO final_price;
+-- 2️⃣ Copy data dari tabel lama
+INSERT INTO ecommerce_new (
+    user_id,
+    product_id,
+    category,
+    price,
+    discount_percent,
+    final_price,
+    payment_method,
+    purchase_date
+)
+SELECT
+    "User_ID",
+    "Product_ID",
+    "Category",
+    "Price (Rs.)",
+    "Discount (%)",
+    "Final_Price(Rs.)",
+    "Payment_Method",
+    "Purchase_Date"
+FROM ecommerce;
 
-ALTER TABLE ecommerce RENAME COLUMN "Payment_Method" TO payment_method;
-ALTER TABLE ecommerce RENAME COLUMN "Purchase_Date" TO purchase_date;
+-- 3️⃣ Hapus tabel lama
+DROP TABLE ecommerce;
+
+-- 4️⃣ Rename tabel baru
+ALTER TABLE ecommerce_new RENAME TO ecommerce;
+
+COMMIT;
