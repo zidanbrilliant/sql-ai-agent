@@ -10,13 +10,9 @@ Project ini dirancang sebagai:
 ---
 
 ## ✨ Fitur Utama
-- Natural Language → SQL otomatis
-- Mengambil schema database **langsung dari SQLite**
-- Validasi tabel & kolom
-- Penanganan kolom dengan karakter khusus
-- Auto retry & SQL fixing ketika error
-- Output hasil query dalam bentuk **pandas DataFrame**
-- Aman dari hallucinated table/column
+- Konversi bahasa alami ke SQL menggunakan LLM (Groq)
+- Menampilkan kueri SQL yang dihasilkan di UI
+- Menjalankan kueri dan menampilkan hasilnya dalam tabel
 
 ---
 
