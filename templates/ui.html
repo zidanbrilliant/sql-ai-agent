@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SQL AI Agent</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f7fa;
+            padding: 40px;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        textarea {
+            width: 100%;
+            height: 80px;
+            padding: 10px;
+            font-size: 14px;
+        }
+        button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        table {
+            margin-top: 20px;
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #f0f0f0;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🧠 Talk to Your Database with SQL AI Agent</h2>
+
+    <!-- ✅ FORM -->
+    <form id="queryForm">
+        <textarea id="question" placeholder="Tulis pertanyaan SQL di sini..."></textarea>
+        <br>
+        <button type="submit" id="submitBtn">Submit</button>
+    </form>
+
+    <div id="error" class="error"></div>
+
+    <!-- 🔽 SQL OUTPUT -->
+    <div id="sql-container" style="display:none;">
+        <h3>🧾 Generated SQL</h3>
+        <pre id="sql-output"></pre>
+    </div>
+
+    <!-- 🔽 RESULT TABLE -->
+    <div id="result" style="display:none;">
+        <h3>📊 Hasil</h3>
+        <div id="result-content"></div>
+    </div>
+</div>
+
+<script>
+const form = document.getElementById("queryForm");
+const textarea = document.getElementById("question");
+const submitBtn = document.getElementById("submitBtn");
+
+const errorDiv = document.getElementById("error");
+const sqlContainer = document.getElementById("sql-container");
+const sqlOutput = document.getElementById("sql-output");
+const resultDiv = document.getElementById("result");
+const resultContent = document.getElementById("result-content");
+
+let isLoading = false;
+
+/* SUBMIT HANDLER */
+form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    if (isLoading) return;
+
+    const question = textarea.value.trim();
+    if (!question) {
+        errorDiv.innerText = "⚠️ Pertanyaan tidak boleh kosong";
+        return;
+    }
+
+    // 🔒 LOCK
+    isLoading = true;
+    submitBtn.disabled = true;
+
+    // RESET UI
+    errorDiv.innerText = "";
+    sqlContainer.style.display = "none";
+    sqlOutput.innerText = "";
+    resultDiv.style.display = "none";
+    resultContent.innerHTML = "";
+
+    try {
+        const res = await fetch("/query", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ question })
+        });
+
+        const data = await res.json();
+
+        // tampilkan SQL
+        if (data.sql) {
+            sqlOutput.textContent = data.sql;
+            sqlContainer.style.display = "block";
+        }
+
+        if (!data.columns || !data.rows) {
+            errorDiv.innerText = "❌ Tidak ada hasil";
+            return;
+        }
+
+        let html = "<table><tr>";
+        data.columns.forEach(col => html += `<th>${col}</th>`);
+        html += "</tr>";
+
+        data.rows.forEach(row => {
+            html += "<tr>";
+            row.forEach(cell => html += `<td>${cell}</td>`);
+            html += "</tr>";
+        });
+
+        html += "</table>";
+
+        resultContent.innerHTML = html;
+        resultDiv.style.display = "block";
+
+    } catch (err) {
+        console.error(err);
+        errorDiv.innerText = "❌ Gagal mengambil data";
+    } finally {
+        // 🔓 UNLOCK (INI YANG BIKIN GA STUCK)
+        isLoading = false;
+        submitBtn.disabled = false;
+        textarea.focus();
+        textarea.select();
+    }
+});
+
+/* ENTER = submit | SHIFT+ENTER = newline */
+textarea.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        form.requestSubmit();
+    }
+});
+</script>
+
+</body>
+</html>
